@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### 🔧 修復 (Fixed)
+- 修正 Gemini `--model` 切換後誤報 `selection could not be verified`：Gemini 現行選單以 `gem-menu-item` 的 `selected` class 標示現用模式（非 `aria-checked`／`aria-selected` 等 ARIA 屬性），驗證邏輯現在會讀取該 class token（`data-active` 屬性為鍵盤焦點狀態，不作選取判斷）。
+
 ---
 
 ## [0.3.1] - 2026-10-15

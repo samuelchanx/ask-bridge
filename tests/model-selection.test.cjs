@@ -5,6 +5,7 @@ const test = require('node:test');
 
 const {
   availablePrimaryLabels,
+  entryFromElement,
   findMatchingEntry,
   parseMenuEntry,
   parseSliderStatusLabel,
@@ -98,6 +99,112 @@ test('verifies selection through checked state or the picker primary label', () 
   assert.equal(selectionVerified(unchecked, '高', ['high', '高']), true);
   assert.equal(selectionVerified(unchecked, '中', ['high', '高']), false);
   assert.equal(selectionVerified(undefined, 'Pro 延伸', ['Pro Extended', 'Pro 延伸']), true);
+});
+
+test('marks Gemini gem-menu-item selected via the class token, never via data-active', () => {
+  const classListItem = {
+    innerText: '3.8 Flash\nAll-around help',
+    textContent: '3.8 Flash\nAll-around help',
+    getAttribute(name) {
+      return { tabindex: '-1', 'data-active': 'false' }[name] ?? null;
+    },
+    classList: { contains: (token) => token === 'selected' },
+    querySelector() {
+      return null;
+    },
+  };
+  const focusedButUnselectedItem = {
+    innerText: '3.5 Flash-Lite\nFastest answers',
+    textContent: '3.5 Flash-Lite\nFastest answers',
+    getAttribute(name) {
+      return { class: 'ng-star-inserted', 'data-active': 'true' }[name] ?? null;
+    },
+    querySelector() {
+      return null;
+    },
+  };
+
+  assert.equal(entryFromElement(classListItem).selected, true);
+  assert.equal(entryFromElement(focusedButUnselectedItem).selected, false);
+});
+
+test('verifies Gemini model selection through the selected class token', async () => {
+  const previousDocument = global.document;
+  const previousKeyboardEvent = global.KeyboardEvent;
+  const previousMouseEvent = global.MouseEvent;
+  const previousPointerEvent = global.PointerEvent;
+  let menuState = 'closed';
+  let selectedMode = 'Flash';
+
+  function element(text, attributes = {}, click = () => {}) {
+    return {
+      innerText: text,
+      textContent: text,
+      click,
+      dispatchEvent() {},
+      getAttribute(name) {
+        const value = typeof attributes[name] === 'function'
+          ? attributes[name]()
+          : attributes[name];
+        return value === undefined ? null : value;
+      },
+      getClientRects() {
+        return [{}];
+      },
+      querySelector() {
+        return null;
+      },
+    };
+  }
+
+  const picker = element('Flash', { 'aria-label': 'Open mode picker, currently Flash' }, () => {
+    menuState = menuState === 'closed' ? 'open' : 'closed';
+  });
+  const flashLite = element('3.5 Flash-Lite\nFastest answers', { class: 'ng-star-inserted' });
+  const flash = element(
+    '3.8 Flash\nAll-around help',
+    {
+      class: () => (selectedMode === '3.8 Flash' ? 'selected ng-star-inserted' : 'ng-star-inserted'),
+    },
+    () => {
+      selectedMode = '3.8 Flash';
+      menuState = 'closed';
+    },
+  );
+  const pro = element('3.1 Pro\nAdvanced reasoning', { class: 'ng-star-inserted' });
+
+  global.KeyboardEvent = class KeyboardEvent {};
+  global.MouseEvent = class MouseEvent {};
+  global.PointerEvent = class PointerEvent {};
+  global.document = {
+    dispatchEvent() {},
+    querySelector() {
+      return null;
+    },
+    querySelectorAll(selector) {
+      if (selector === 'button') return [picker];
+      return menuState === 'open' ? [flashLite, flash, pro] : [];
+    },
+  };
+
+  try {
+    const result = await selectProviderOption({
+      provider: 'gemini',
+      kind: 'model',
+      targetAliases: ['3.8 Flash'],
+      verificationAliases: ['3.8 Flash'],
+      sleep: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.selected, '3.8 Flash');
+    assert.equal(selectedMode, '3.8 Flash');
+  } finally {
+    global.document = previousDocument;
+    global.KeyboardEvent = previousKeyboardEvent;
+    global.MouseEvent = previousMouseEvent;
+    global.PointerEvent = previousPointerEvent;
+  }
 });
 
 test('revisits ChatGPT nested menus when verifying a selected model', async () => {

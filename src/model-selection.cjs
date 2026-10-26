@@ -40,7 +40,8 @@
       secondaryDescription: secondaryLines.join(' '),
       badgeText,
       selected: textMarksSelected
-        || selectedValues.some((value) => ['true', 'checked', 'selected'].includes(value)),
+        || selectedValues.some((value) => ['true', 'checked', 'selected'].includes(value))
+        || Boolean(source.classSelected),
       element: source.element,
     };
   }
@@ -71,6 +72,17 @@
       : '';
   }
 
+  // Gemini's gem-menu-item marks the active mode with a `selected` class token
+  // instead of any aria/state attribute, so read the class as a selected signal.
+  // `data-active="true"` is keyboard focus, NOT selection — never map it.
+  function elementMarkedSelected(element) {
+    if (typeof element.classList !== 'undefined' && element.classList !== null) {
+      return element.classList.contains('selected');
+    }
+    const className = String((element.getAttribute && element.getAttribute('class')) || '');
+    return /(^|\s)selected(\s|$)/.test(className);
+  }
+
   function entryFromElement(element) {
     const badge = element.querySelector
       ? element.querySelector('[data-testid*="badge"], [class*="badge"]')
@@ -90,6 +102,7 @@
         || (selectedDescendant && selectedDescendant.getAttribute('data-selected')),
       dataState: element.getAttribute('data-state')
         || (selectedDescendant && selectedDescendant.getAttribute('data-state')),
+      classSelected: elementMarkedSelected(element),
       badgeText: textOf(badge),
       element,
     });
@@ -376,6 +389,7 @@
 
   return {
     availablePrimaryLabels,
+    entryFromElement,
     findMatchingEntry,
     normalizeLabel,
     parseMenuEntry,
