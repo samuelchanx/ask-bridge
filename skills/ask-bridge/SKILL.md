@@ -189,7 +189,7 @@ prompt + "\n\n" + stdin
 | `--file <FILE>` | 附加文件檔，可重複指定 | 支援 PDF、Word、Excel、PowerPoint、純文字、Markdown、CSV、JSON、程式碼等；ChatGPT、Gemini 與 Claude 都可用 |
 | `--timeout <SECONDS>` | 設定等待上限 | 必須是大於 0 的整數，預設 `300` 秒；同時套用於一般回覆與 `login` 登入偵測 |
 | `--model <MODEL>` | 送出 prompt 前切換模型 | 比對不分大小寫與標點；模型名稱取決於 provider UI 與帳號權限 |
-| `--reasoning <REASONING>` | 切換 provider 推理模式 | ChatGPT 支援 `instant`、`medium`、`high`、`xhigh`（新版已無 `auto`）；Gemini 支援 `extended`；Claude 不支援 |
+| `--reasoning <REASONING>` | 切換 provider 推理模式 | ChatGPT 支援 `instant`、`medium`、`high`、`xhigh`（新版已無 `auto`）；Gemini 支援 `low`、`medium`、`high`（Thinking level 子選單）；`extended` 為舊版 Pro 專用遺留值；Claude 不支援 |
 | `-h`, `--help` | 顯示 help | 可用 `ask-bridge --help` 或 `ask-bridge help <COMMAND>` |
 
 只有 `--provider` 是 global option，可放在子命令前後。其他頂層選項搭配子命令時必須放在子命令之前，例如 `ask-bridge --timeout 600 login`、`ask-bridge --output /tmp/reply.md get <url>`；不要寫成 `ask-bridge login --timeout 600` 或 `ask-bridge get <url> --output ...`。
@@ -327,12 +327,12 @@ ask-bridge --timeout 600 login
 ```sh
 ask-bridge '證明這個數學問題。' --model 'GPT-5.6 Sol' --reasoning high
 ask-bridge '快速翻譯這段話。' --reasoning instant
-ask-bridge --provider gemini '用幾句話介紹 Rust。' --model '3.6 Flash'
-ask-bridge --provider gemini '證明這個數學問題。' --model '3.1 Pro' --reasoning extended
+ask-bridge --provider gemini '用幾句話介紹 Rust。' --model '3.8 Flash' --reasoning medium
+ask-bridge --provider gemini '證明這個數學問題。' --model '3.1 Pro' --reasoning high
 ask-bridge --provider claude '用幾句話介紹 Rust。' --model Sonnet
 ```
 
-ChatGPT 的 `--reasoning` 支援 `instant`、`medium`、`high`、`xhigh` 與對應中文別名（新版推理滑桿已無「自動」）；ask-bridge 一律使用 ChatGPT「對話（Chat）」模式，不使用「工作（Work）」模式；Gemini 只支援 `extended`，且不能搭配非 Pro 模型；Claude 不支援 `--reasoning`。
+ChatGPT 的 `--reasoning` 支援 `instant`、`medium`、`high`、`xhigh` 與對應中文別名（新版推理滑桿已無「自動」）；ask-bridge 一律使用 ChatGPT「對話（Chat）」模式，不使用「工作（Work）」模式。Gemini 的 `--reasoning` 會走模型選單內的「Thinking level」子選單，支援 `low`、`medium`、`high`（2026-10-29 起，父項以 `aria-haspopup="true"` 標示）；舊值 `extended` 為 Pro 專用遺留值，且不能搭配非 Pro 模型；Claude 不支援 `--reasoning`。
 
 模型只比對 provider 選單的主標籤，忽略副標題與 badge，且不會把不存在的舊版本自動對應到其他版本。若切換失敗，應依錯誤列出的目前選項修正參數，不要猜測替代模型名稱。舊用法 `--model 高` 與 `--model 延伸思考` 暫時可用，但應改成 `--reasoning`。
 

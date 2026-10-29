@@ -245,23 +245,31 @@
 
   async function findProviderOption(config, menuSelector, available, sleep) {
     const visited = new Set();
-    const maxDepth = config.provider === 'chatgpt' ? 6 : 1;
+    // ChatGPT nests its picker several levels deep. Gemini nests only one level,
+    // and only for the "Thinking level" submenu inside the model picker menu, so
+    // descend solely when selecting a reasoning option. Gemini marks the parent
+    // item with aria-haspopup="true" where ChatGPT uses aria-haspopup="menu".
+    const canDescend = config.provider === 'chatgpt'
+      || (config.provider === 'gemini' && config.kind === 'reasoning');
+    const maxDepth = config.provider === 'chatgpt' ? 6 : canDescend ? 2 : 1;
+    const hasSubmenu = (entry) => ['menu', 'true']
+      .includes(entry.element.getAttribute('aria-haspopup'));
 
     for (let depth = 0; depth < maxDepth; depth += 1) {
       const elements = visibleElements(menuSelector);
       const entries = elements.map(entryFromElement);
       entries.forEach((entry) => available.add(entry.primaryLabel));
       const leaves = entries.filter(
-        (entry) => entry.element.getAttribute('aria-haspopup') !== 'menu'
-          && !isChatGptPickerControl(entry.element),
+        (entry) => !hasSubmenu(entry) && !isChatGptPickerControl(entry.element),
       );
       const chosen = findMatchingEntry(leaves, config.targetAliases);
-      if (chosen || config.provider !== 'chatgpt') return chosen;
+      if (chosen || !canDescend) return chosen;
 
       // The redesigned ChatGPT picker shows the reasoning slider first and
       // reveals model choices through a view toggle instead of a submenu.
+      // Gemini's "Thinking level" entry opens a plain submenu of the same shape.
       const triggers = entries.filter(
-        (entry) => entry.element.getAttribute('aria-haspopup') === 'menu'
+        (entry) => hasSubmenu(entry)
           || entry.element.getAttribute('data-model-picker-view-toggle') !== null,
       );
       const trigger = triggers.find((entry) => {

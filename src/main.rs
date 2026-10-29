@@ -457,6 +457,9 @@ enum ReasoningRequest {
     ChatGptMedium,
     ChatGptHigh,
     ChatGptExtraHigh,
+    GeminiLow,
+    GeminiMedium,
+    GeminiHigh,
     GeminiExtended,
 }
 
@@ -470,6 +473,11 @@ impl ReasoningRequest {
             ReasoningRequest::ChatGptExtraHigh => {
                 &["extra high", "xhigh", "very high", "max", "極高", "极高"]
             }
+            // The Gemini "Thinking level" submenu options (Low / Medium / High);
+            // its items carry a secondary description line under the same label.
+            ReasoningRequest::GeminiLow => &["low", "低"],
+            ReasoningRequest::GeminiMedium => &["medium", "中", "中等"],
+            ReasoningRequest::GeminiHigh => &["high", "高"],
             ReasoningRequest::GeminiExtended => &["extended thinking", "延伸思考"],
         }
     }
@@ -514,6 +522,9 @@ fn parse_chatgpt_reasoning(value: &str) -> Option<ReasoningRequest> {
 
 fn parse_gemini_reasoning(value: &str) -> Option<ReasoningRequest> {
     match normalize_option_label(value).as_str() {
+        "low" | "低" => Some(ReasoningRequest::GeminiLow),
+        "medium" | "中" | "中等" => Some(ReasoningRequest::GeminiMedium),
+        "high" | "高" => Some(ReasoningRequest::GeminiHigh),
         "extended" | "extendedthinking" | "延伸思考" | "proextended" | "pro延伸" => {
             Some(ReasoningRequest::GeminiExtended)
         }
@@ -556,7 +567,7 @@ fn resolve_selection_plan(
             )
         })?),
         (Provider::Gemini, Some(value)) => Some(parse_gemini_reasoning(value).ok_or_else(|| {
-            format!("Unsupported Gemini reasoning '{value}'. Supported value: extended")
+            format!("Unsupported Gemini reasoning '{value}'. Supported values: low, medium, high, extended")
         })?),
         (Provider::Claude, Some(_)) => {
             return Err(
@@ -3815,6 +3826,29 @@ mod tests {
         assert_eq!(plan.model.as_deref(), Some("GPT-5.6 Sol"));
         assert_eq!(plan.reasoning, Some(ReasoningRequest::ChatGptMedium));
         assert!(!plan.used_legacy_model);
+    }
+
+    #[test]
+    fn resolves_gemini_thinking_levels_for_any_model() {
+        // "4 Argon" is not a Pro model — Instant/Medium/High thinking must still pass.
+        let plan =
+            resolve_selection_plan(Provider::Gemini, Some("4 Argon"), Some("medium")).unwrap();
+        assert_eq!(plan.model.as_deref(), Some("4 Argon"));
+        assert_eq!(plan.reasoning, Some(ReasoningRequest::GeminiMedium));
+        assert!(!plan.used_legacy_model);
+
+        for (value, expected) in [
+            ("low", ReasoningRequest::GeminiLow),
+            ("低", ReasoningRequest::GeminiLow),
+            ("medium", ReasoningRequest::GeminiMedium),
+            ("中等", ReasoningRequest::GeminiMedium),
+            ("high", ReasoningRequest::GeminiHigh),
+            ("高", ReasoningRequest::GeminiHigh),
+        ] {
+            let plan =
+                resolve_selection_plan(Provider::Gemini, Some("4 Argon"), Some(value)).unwrap();
+            assert_eq!(plan.reasoning, Some(expected), "value: {value}");
+        }
     }
 
     #[test]

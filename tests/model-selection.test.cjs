@@ -207,6 +207,95 @@ test('verifies Gemini model selection through the selected class token', async (
   }
 });
 
+test('descends into the Gemini Thinking level submenu to pick a reasoning option', async () => {
+  const previousDocument = global.document;
+  const previousKeyboardEvent = global.KeyboardEvent;
+  const previousMouseEvent = global.MouseEvent;
+  const previousPointerEvent = global.PointerEvent;
+  let menuState = 'closed';
+  let thinkingLevel = '中等';
+
+  function element(text, attributes = {}, click = () => {}) {
+    return {
+      innerText: text,
+      textContent: text,
+      click,
+      dispatchEvent() {},
+      getAttribute(name) {
+        const value = typeof attributes[name] === 'function'
+          ? attributes[name]()
+          : attributes[name];
+        return value === undefined ? null : value;
+      },
+      getClientRects() {
+        return [{}];
+      },
+      querySelector() {
+        return null;
+      },
+    };
+  }
+
+  const picker = element('3.8 Flash', { 'aria-label': 'Open mode picker, currently 3.8 Flash' }, () => {
+    menuState = menuState === 'closed' ? 'top' : 'closed';
+  });
+  const flashLite = element('3.5 Flash-Lite\nFastest answers', { class: 'ng-star-inserted' });
+  const flash = element('3.8 Flash\nAll-around help', { class: 'ng-star-inserted' });
+  const pro = element('3.1 Pro\nAdvanced math and coding', { class: 'ng-star-inserted' });
+  const argon = element('4 Argon\nNewest model', { class: 'ng-star-inserted' });
+  const thinkingTrigger = element(
+    'Thinking level\nChoose how deeply the model thinks',
+    { 'aria-haspopup': 'true' },
+    () => {
+      menuState = 'submenu';
+    },
+  );
+  const levelItem = (label) => element(
+    label,
+    { class: () => (thinkingLevel === label ? 'selected ng-star-inserted' : 'ng-star-inserted') },
+    () => {
+      thinkingLevel = label;
+      menuState = 'closed';
+    },
+  );
+  const levels = [levelItem('Low'), levelItem('Medium'), levelItem('High')];
+
+  global.KeyboardEvent = class KeyboardEvent {};
+  global.MouseEvent = class MouseEvent {};
+  global.PointerEvent = class PointerEvent {};
+  global.document = {
+    dispatchEvent() {},
+    querySelector() {
+      return null;
+    },
+    querySelectorAll(selector) {
+      if (selector === 'button') return [picker];
+      if (menuState === 'top') return [flashLite, flash, pro, argon, thinkingTrigger];
+      if (menuState === 'submenu') return [flashLite, flash, pro, argon, thinkingTrigger, ...levels];
+      return [];
+    },
+  };
+
+  try {
+    const result = await selectProviderOption({
+      provider: 'gemini',
+      kind: 'reasoning',
+      targetAliases: ['medium', '中', '中等'],
+      verificationAliases: ['medium', '中', '中等'],
+      sleep: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.selected, 'Medium');
+    assert.equal(thinkingLevel, 'Medium');
+  } finally {
+    global.document = previousDocument;
+    global.KeyboardEvent = previousKeyboardEvent;
+    global.MouseEvent = previousMouseEvent;
+    global.PointerEvent = previousPointerEvent;
+  }
+});
+
 test('revisits ChatGPT nested menus when verifying a selected model', async () => {
   const previousDocument = global.document;
   const previousKeyboardEvent = global.KeyboardEvent;
